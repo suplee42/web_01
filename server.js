@@ -16,8 +16,6 @@ app.use(
   })
 );
 
-//test
-
 //////////// cookie 설정
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());

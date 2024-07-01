@@ -5,12 +5,12 @@ const { ObjectId } = require("mongodb");
 const crypto = require('crypto');
 const multer = require('multer');
 
-const storage=multer.diskStorage({
+const storage = multer.diskStorage({
   destination: (req, file, done) => {
-  done(null, './public/image')
+    done(null, './public/image')
   }, filename: (req, file, done) => {
     done(null, file.originalname)
-  }, limit : 5*1024*1024
+  }, limit: 5 * 1024 * 1024
 });
 
 const upload = multer({ storage });
@@ -18,9 +18,9 @@ const upload = multer({ storage });
 
 ////////파일 첨부 처리
 let imagepath = '';
-router.post('/post/photo',upload.single('picture') , (req, res) => {
+router.post('/post/photo', upload.single('picture'), (req, res) => {
   console.log('서버에 파일 첨부하기', req.file.path);
-  imagepath =  req.file.originalname;
+  imagepath = req.file.originalname;
 });
 
 
@@ -100,27 +100,27 @@ router.post("/post/save", async (req, res) => {
   if (req.session.user) {
     if (req.session.user.userid == req.body.id) {
       console.log('req.session.csrf_token', req.session.csrf_token)
-      if (typeof req.session.csrf_token != 'undefined' &&  typeof req.body.frsc != 'undefined' &&  req.session.csrf_token==req.body.frsc) { //csrf_token이 맞으면
+      if (typeof req.session.csrf_token != 'undefined' && typeof req.body.frsc != 'undefined' && req.session.csrf_token == req.body.frsc) { //csrf_token이 맞으면
         const { mongodb } = await setup();
         mongodb
-        .collection("post")
+          .collection("post")
           .insertOne({
             id: req.body.id,
             title: req.body.title,
             content: req.body.content,
             date: new Date(),
-            path:imagepath
+            path: imagepath
           })
-        .then((result) => {
-          //console.log(result);
-          console.log("데이터 추가 성공");
-          delete req.session.csrf_token;
-          list(mongodb, req, res);
-        });
+          .then((result) => {
+            //console.log(result);
+            console.log("데이터 추가 성공");
+            delete req.session.csrf_token;
+            list(mongodb, req, res);
+          });
       } else {
         console.log("글쓰기 csrf 해킹 시도 발생...");
         res.render("index.ejs", { data: { alertMsg: "글쓰기 csrf 해킹 시도 발생! 주의요망!!" } });
-      }      
+      }
     } else {
       console.log("글쓰기 해킹 시도 발생...");
       res.render("index.ejs", { data: { alertMsg: "로그인 사용자와 글작성자가 일치하지 않습니다 " } });
@@ -134,8 +134,8 @@ router.post("/post/save", async (req, res) => {
 //로그인 된 사용자만 글쓰기 화면 보여주기
 router.get("/post/enter", function (req, res) {
   if (req.session.user) {
-    req.session.csrf_token=crypto.randomBytes(32).toString('hex');
-    res.render("post/enter.ejs", { data: { id: req.session.user.userid }, csrf_token:req.session.csrf_token  });
+    req.session.csrf_token = crypto.randomBytes(32).toString('hex');
+    res.render("post/enter.ejs", { data: { id: req.session.user.userid }, csrf_token: req.session.csrf_token });
   } else {
     res.render("index.ejs", { data: { alertMsg: "로그인 먼저 해주세요" } });
   }
@@ -149,6 +149,38 @@ router.get("/post/list", async (req, res) => {
   } else {
     res.render("index.ejs", { data: { alertMsg: "로그인 먼저 해주세요" } });
   }
+});
+
+//검색결과
+router.get("/search", async function (req, res) {
+  let page = parseInt(req.query.page ? req.query.page : 1);
+  console.log(page);
+  const limit = 3;
+  const skip = (page - 1) * limit;
+
+  const { mongodb } = await setup();
+  console.log(req.query.value);
+  mongodb
+    .collection("post")
+    .find({ "title": { '$regex': req.query.value } })
+    .count({})
+    .then((totalPosts) => {
+      // 총 페이지 수 계산
+      const totalPages = Math.ceil(totalPosts / limit);
+
+      // 현재 페이지의 게시물 목록 조회
+      mongodb
+        .collection("post")
+        .find({ "title": { '$regex': req.query.value } })
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray()
+        .then((result) => {
+          res.render("post/list.ejs", { data: result, currentPage: page, totalPages });
+          console.log(result);
+        });
+    });
 });
 
 function list(mongodb, req, res) {
